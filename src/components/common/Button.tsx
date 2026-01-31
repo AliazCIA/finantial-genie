@@ -14,6 +14,7 @@ interface ButtonProps {
   disabled?: boolean;
   fullWidth?: boolean;
   icon?: string;
+  style?: any;
 }
 
 export default function Button({
@@ -25,6 +26,7 @@ export default function Button({
   disabled = false,
   fullWidth = false,
   icon,
+  style,
 }: ButtonProps) {
   const { theme } = useTheme();
   const themeColors = getThemeColors(theme);
@@ -99,11 +101,11 @@ export default function Button({
       opacity: disabled ? 0.5 : 1,
       width: fullWidth ? '100%' : 'auto',
       ...(variant === 'primary' && getShadowStyle(2)),
-      ...(Platform.OS === 'web' && {
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: `all ${TRANSITION_DURATION}ms ease`,
-        userSelect: 'none',
-      }),
+      ...(Platform.OS === 'web' ? {
+        cursor: (disabled ? 'not-allowed' : 'pointer') as any,
+        transition: `all ${TRANSITION_DURATION}ms ease` as any,
+        userSelect: 'none' as any,
+      } : {}),
     },
     buttonText: {
       ...typography.button,
@@ -143,17 +145,21 @@ export default function Button({
 
   return (
     <TouchableOpacity
-      style={dynamicStyles.button}
+      style={[dynamicStyles.button, style]}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}
       {...(Platform.OS === 'web' ? webHandlers : {})}
     >
       {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variantStyles.textColor}
-        />
+        <>
+          <ActivityIndicator
+            size="small"
+            color={variantStyles.textColor}
+            style={{ marginRight: 8 }}
+          />
+          <Text style={dynamicStyles.buttonText}>{title}</Text>
+        </>
       ) : (
         <>
           {icon && <Text style={dynamicStyles.icon}>{icon}</Text>}

@@ -4,11 +4,12 @@ import { useTransactions } from './useTransactions';
 import { useInstallments } from './useInstallments';
 import { calculateBiweeklyAvailability, getMonthlyIncome } from '../services/calculations/biweeklyAvailability';
 import { getMonth, getYear } from 'date-fns';
+import type { FixedExpenseSchema } from '../services/database/schema';
 
 export const useBiweeklyAvailability = (period: 1 | 2 = 1) => {
   const { transactions } = useTransactions();
   const { payments } = useInstallments();
-  const [fixedExpenses, setFixedExpenses] = useState([]);
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpenseSchema[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

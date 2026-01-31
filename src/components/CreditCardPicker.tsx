@@ -4,6 +4,7 @@ import { useTheme, getThemeColors } from '../context/ThemeContext';
 import { useCreditCards } from '../hooks/useCreditCards';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { isMobile } from '../utils/responsive';
 
 interface CreditCardPickerProps {
   value: string | null;
@@ -31,8 +32,9 @@ export default function CreditCardPicker({
       borderWidth: 1,
       borderColor: themeColors.border,
       borderRadius: 12,
-      padding: spacing.md,
-      minHeight: 50,
+      paddingVertical: 4,
+      paddingHorizontal: spacing.md,
+      minHeight: 32,
       justifyContent: 'center',
     },
     text: {

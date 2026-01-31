@@ -142,6 +142,39 @@ class FinancialGenieDB extends Dexie {
       creditCards: 'id, isActive',
       recurringExpenses: 'id, startDate, isActive',
     });
+
+    // Version 5: Added recurrence fields to transactions
+    this.version(5).stores({
+      transactions: 'id, date, type, *tags, creditCardId, parentRecurringId',
+      categories: 'id',
+      fixedExpenses: 'id, startDate',
+      installmentPurchases: 'id, startDate, creditCardId',
+      installmentPayments: 'id, installmentPurchaseId, dueDate, status',
+      assets: 'id',
+      liabilities: 'id',
+      investments: 'id',
+      investmentOpportunities: 'id, isActive',
+      creditCards: 'id, isActive',
+      recurringExpenses: 'id, startDate, isActive',
+    }).upgrade(async (tx) => {
+      // Migration: Add default values for new recurrence fields
+      const transactions = await tx.table('transactions').toCollection().toArray();
+      for (const txn of transactions) {
+        const updates: any = {};
+        if (txn.recurrencePeriod === undefined) {
+          updates.recurrencePeriod = null;
+        }
+        if (txn.recurrenceStartDate === undefined) {
+          updates.recurrenceStartDate = null;
+        }
+        if (txn.parentRecurringId === undefined) {
+          updates.parentRecurringId = null;
+        }
+        if (Object.keys(updates).length > 0) {
+          await tx.table('transactions').update(txn.id, updates);
+        }
+      }
+    });
   }
 }
 
@@ -522,7 +555,7 @@ class DexieInvestmentOpportunityRepository implements InvestmentOpportunityRepos
   }
 
   async getActive(): Promise<InvestmentOpportunitySchema[]> {
-    return this.db.investmentOpportunities.where('isActive').equals(true).toArray();
+    return this.db.investmentOpportunities.filter((item) => item.isActive === true).toArray();
   }
 
   async getById(id: string): Promise<InvestmentOpportunitySchema | null> {
@@ -565,7 +598,7 @@ class DexieCreditCardRepository implements CreditCardRepository {
   }
 
   async getActive(): Promise<CreditCardSchema[]> {
-    return this.db.creditCards.where('isActive').equals(true).toArray();
+    return this.db.creditCards.filter((item) => item.isActive === true).toArray();
   }
 
   async getById(id: string): Promise<CreditCardSchema | null> {
@@ -609,7 +642,7 @@ class DexieRecurringExpenseRepository implements RecurringExpenseRepository {
   }
 
   async getActive(): Promise<RecurringExpenseSchema[]> {
-    return this.db.recurringExpenses.where('isActive').equals(true).toArray();
+    return this.db.recurringExpenses.filter((item) => item.isActive === true).toArray();
   }
 
   async getById(id: string): Promise<RecurringExpenseSchema | null> {

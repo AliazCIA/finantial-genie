@@ -3,6 +3,7 @@ import { TextInput, StyleSheet, View, Text } from 'react-native';
 import { useTheme, getThemeColors } from '../../context/ThemeContext';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import { isMobile } from '../../utils/responsive';
 
 interface CurrencyInputProps {
   value: string;
@@ -90,8 +91,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: spacing.md,
+    minHeight: 32,
   },
   currencySymbol: {
     ...typography.body,
@@ -100,6 +102,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     ...typography.body,
-    paddingVertical: spacing.md,
+    paddingVertical: 4,
   },
 });

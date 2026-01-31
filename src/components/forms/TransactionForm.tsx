@@ -25,9 +25,10 @@ interface TransactionFormProps {
   onClose: () => void;
   initialDate?: Date;
   transaction?: TransactionSchema; // For editing
+  initialType?: 'income' | 'expense'; // Initial type when opening form
 }
 
-export default function TransactionForm({ onClose, initialDate, transaction }: TransactionFormProps) {
+export default function TransactionForm({ onClose, initialDate, transaction, initialType }: TransactionFormProps) {
   const { createTransaction, updateTransaction } = useTransactions();
   const { categories } = useCategories();
   const { showToast } = useToast();
@@ -37,7 +38,7 @@ export default function TransactionForm({ onClose, initialDate, transaction }: T
   const isEditing = !!transaction;
   
   const [type, setType] = useState<'income' | 'expense'>(
-    transaction?.type || TRANSACTION_TYPES.EXPENSE
+    transaction?.type || initialType || TRANSACTION_TYPES.EXPENSE
   );
   const [description, setDescription] = useState(transaction?.description || '');
   const [amount, setAmount] = useState(transaction?.amount.toString() || '');
@@ -107,7 +108,7 @@ export default function TransactionForm({ onClose, initialDate, transaction }: T
     },
     content: {
       padding: spacing.lg,
-      paddingBottom: spacing.xl * 2, // Extra space for button
+      paddingBottom: 80, // Extra space for button
     },
     header: {
       flexDirection: 'row',
@@ -116,82 +117,81 @@ export default function TransactionForm({ onClose, initialDate, transaction }: T
       marginBottom: spacing.lg,
     },
     title: {
-      ...typography.h1,
-      color: themeColors.primary,
+      ...typography.h3,
+      color: themeColors.text,
       fontWeight: '700',
     },
     closeButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: themeColors.surface,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: themeColors.border,
+      padding: spacing.xs,
     },
     closeText: {
       fontSize: 24,
       color: themeColors.textSecondary,
-      lineHeight: 24,
     },
     section: {
-      marginBottom: spacing.lg,
+      marginBottom: spacing.md,
     },
     label: {
-      ...typography.body,
-      color: themeColors.text,
-      marginBottom: spacing.sm,
-      fontWeight: '600',
+      ...typography.bodySmall,
+      color: themeColors.textSecondary,
+      marginBottom: spacing.xs,
+      fontWeight: '500',
     },
     input: {
       ...typography.body,
-      backgroundColor: themeColors.surface,
       borderWidth: 1,
       borderColor: themeColors.border,
-      borderRadius: 12,
-      padding: spacing.md,
+      borderRadius: 8,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
       color: themeColors.text,
+      backgroundColor: themeColors.background,
+      marginBottom: spacing.md,
     },
     typeContainer: {
       flexDirection: 'row',
-      gap: spacing.sm,
+      marginBottom: spacing.md,
+      borderRadius: 8,
+      backgroundColor: themeColors.background,
+      padding: spacing.xs,
     },
     typeButton: {
       flex: 1,
-      padding: spacing.md,
-      borderRadius: 12,
-      backgroundColor: themeColors.surface,
-      borderWidth: 2,
-      borderColor: themeColors.border,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: 6,
       alignItems: 'center',
     },
     typeButtonActive: {
       backgroundColor: themeColors.primary,
-      borderColor: themeColors.primary,
     },
     typeButtonText: {
       ...typography.body,
-      color: themeColors.text,
       fontWeight: '600',
     },
     typeButtonTextActive: {
       color: themeColors.background,
     },
+    typeButtonTextInactive: {
+      color: themeColors.text,
+    },
     tagsContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: spacing.sm,
+      marginBottom: spacing.md,
     },
     tag: {
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
       borderRadius: 20,
-      borderWidth: 2,
-      backgroundColor: themeColors.surface,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+      backgroundColor: themeColors.background,
     },
     tagSelected: {
       backgroundColor: themeColors.primary + '20',
+      borderColor: themeColors.primary,
     },
     tagText: {
       ...typography.bodySmall,
@@ -201,28 +201,20 @@ export default function TransactionForm({ onClose, initialDate, transaction }: T
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingVertical: spacing.sm,
+      paddingVertical: 0,
+      marginTop: 0,
     },
     submitButton: {
       backgroundColor: themeColors.primary,
-      paddingVertical: spacing.lg,
-      paddingHorizontal: spacing.xl,
-      borderRadius: 16,
+      paddingVertical: spacing.md,
+      borderRadius: 8,
       alignItems: 'center',
-      marginTop: spacing.xl,
-      shadowColor: themeColors.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 8,
-      borderWidth: 2,
-      borderColor: themeColors.primaryLight,
+      marginTop: spacing.md,
     },
     submitButtonText: {
-      ...typography.h4,
+      ...typography.body,
       color: themeColors.background,
-      fontWeight: '700',
-      letterSpacing: 0.5,
+      fontWeight: '600',
     },
     buttonContainer: {
       position: 'absolute',
@@ -233,17 +225,16 @@ export default function TransactionForm({ onClose, initialDate, transaction }: T
       padding: spacing.lg,
       borderTopWidth: 1,
       borderTopColor: themeColors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 5,
     },
   });
 
   return (
     <View style={dynamicStyles.container}>
-      <ScrollView style={dynamicStyles.container} contentContainerStyle={dynamicStyles.content}>
+      <ScrollView 
+        style={dynamicStyles.container} 
+        contentContainerStyle={dynamicStyles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={dynamicStyles.header}>
           <Text style={dynamicStyles.title}>
             {isEditing ? 'Editar Transacción' : 'Nueva Transacción'}
@@ -267,7 +258,9 @@ export default function TransactionForm({ onClose, initialDate, transaction }: T
               <Text
                 style={[
                   dynamicStyles.typeButtonText,
-                  type === TRANSACTION_TYPES.INCOME && dynamicStyles.typeButtonTextActive,
+                  type === TRANSACTION_TYPES.INCOME 
+                    ? dynamicStyles.typeButtonTextActive 
+                    : dynamicStyles.typeButtonTextInactive,
                 ]}
               >
                 Ingreso
@@ -283,12 +276,24 @@ export default function TransactionForm({ onClose, initialDate, transaction }: T
               <Text
                 style={[
                   dynamicStyles.typeButtonText,
-                  type === TRANSACTION_TYPES.EXPENSE && dynamicStyles.typeButtonTextActive,
+                  type === TRANSACTION_TYPES.EXPENSE 
+                    ? dynamicStyles.typeButtonTextActive 
+                    : dynamicStyles.typeButtonTextInactive,
                 ]}
               >
                 Gasto
               </Text>
             </TouchableOpacity>
+          </View>
+          {/* Gasto recurrente - debajo de los botones de tipo */}
+          <View style={[dynamicStyles.switchRow, { marginTop: spacing.xs }]}>
+            <Text style={[dynamicStyles.label, { marginBottom: 0 }]}>Gasto recurrente</Text>
+            <Switch
+              value={isRecurring}
+              onValueChange={setIsRecurring}
+              trackColor={{ false: themeColors.border, true: themeColors.primary }}
+              thumbColor={themeColors.background}
+            />
           </View>
         </View>
 
@@ -359,19 +364,6 @@ export default function TransactionForm({ onClose, initialDate, transaction }: T
           </View>
         </View>
 
-        {/* Recurrente */}
-        <View style={dynamicStyles.section}>
-          <View style={dynamicStyles.switchRow}>
-            <Text style={dynamicStyles.label}>Gasto recurrente</Text>
-            <Switch
-              value={isRecurring}
-              onValueChange={setIsRecurring}
-              trackColor={{ false: themeColors.border, true: themeColors.primary }}
-              thumbColor={themeColors.background}
-            />
-          </View>
-        </View>
-
         {/* Pagado (solo para gastos) */}
         {type === TRANSACTION_TYPES.EXPENSE && (
           <View style={dynamicStyles.section}>
@@ -388,7 +380,7 @@ export default function TransactionForm({ onClose, initialDate, transaction }: T
         )}
 
         {/* Spacer for fixed button */}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 20 }} />
       </ScrollView>
 
       {/* Botón de guardar fijo en la parte inferior */}

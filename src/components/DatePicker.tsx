@@ -4,6 +4,7 @@ import { useTheme, getThemeColors } from '../context/ThemeContext';
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
+import { isMobile } from '../utils/responsive';
 
 interface DatePickerProps {
   value: Date;
@@ -33,13 +34,16 @@ export default function DatePicker({ value, onChange, style }: DatePickerProps) 
       borderWidth: 1,
       borderColor: themeColors.border,
       borderRadius: 12,
-      padding: spacing.md,
-      minHeight: 50,
+      paddingVertical: 2,
+      paddingHorizontal: spacing.md,
+      minHeight: 28,
       justifyContent: 'center',
     },
     dateText: {
       ...typography.body,
       color: themeColors.text,
+      fontSize: isMobile ? 12 : 14,
+      lineHeight: isMobile ? 16 : 18,
     },
     icon: {
       ...typography.body,

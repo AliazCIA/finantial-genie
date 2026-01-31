@@ -11,6 +11,7 @@ interface CardProps {
   marginBottom?: number;
   elevated?: boolean;
   interactive?: boolean;
+  style?: any;
 }
 
 export default function Card({
@@ -20,6 +21,7 @@ export default function Card({
   marginBottom = spacing.md,
   elevated = true,
   interactive = false,
+  style,
 }: CardProps) {
   const { theme } = useTheme();
   const themeColors = getThemeColors(theme);
@@ -74,7 +76,7 @@ export default function Card({
   if (onPress) {
     return (
       <TouchableOpacity
-        style={dynamicStyles.card}
+        style={[dynamicStyles.card, style]}
         onPress={onPress}
         activeOpacity={0.95}
         {...webHandlers}
@@ -84,5 +86,5 @@ export default function Card({
     );
   }
 
-  return <View style={dynamicStyles.card}>{children}</View>;
+  return <View style={[dynamicStyles.card, style]}>{children}</View>;
 }

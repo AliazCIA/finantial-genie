@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { DatabaseAdapter } from './adapter.interface';
 import { DexieAdapter } from './dexieAdapter';
 import { AsyncStorageAdapter } from './asyncStorageAdapter';
+import { SyncTrackingAdapter } from '../sync/syncAdapter';
 
 let databaseAdapter: DatabaseAdapter | null = null;
 
@@ -10,15 +11,20 @@ export const getDatabase = async (): Promise<DatabaseAdapter> => {
     return databaseAdapter;
   }
 
-  // Use Dexie (IndexedDB) for web, AsyncStorage for mobile
+  // Use local storage: Dexie for web, AsyncStorage for mobile
+  // This enables offline-first functionality
+  let baseAdapter: DatabaseAdapter;
   if (Platform.OS === 'web') {
-    databaseAdapter = new DexieAdapter();
+    baseAdapter = new DexieAdapter();
   } else {
-    // Use AsyncStorage for mobile (works with Expo Go)
-    databaseAdapter = new AsyncStorageAdapter();
+    baseAdapter = new AsyncStorageAdapter();
   }
 
-  await databaseAdapter.initialize();
+  await baseAdapter.initialize();
+  
+  // Wrap with sync tracking to enable server synchronization
+  databaseAdapter = new SyncTrackingAdapter(baseAdapter);
+  
   return databaseAdapter;
 };
 

@@ -21,6 +21,7 @@ import {
   InstallmentsIcon,
   AssetsIcon,
   InvestmentsIcon,
+  SettingsIcon,
 } from './TabIcons';
 
 interface Tab {
@@ -39,22 +40,23 @@ interface ModernTabBarProps {
 // Tabs principales con iconos (móvil - máximo 5)
 const PRIMARY_TABS_MOBILE: Tab[] = [
   { name: 'Dashboard', label: 'Inicio', icon: HomeIcon, route: 'Dashboard' },
-  { name: 'Payments', label: 'Pagos', icon: PaymentsIcon, route: 'Payments' },
   { name: 'Transactions', label: 'Trans.', icon: TransactionsIcon, route: 'Transactions' },
   { name: 'CreditCards', label: 'Tarjetas', icon: CardsIcon, route: 'CreditCards' },
+  { name: 'Payments', label: 'Pagos', icon: PaymentsIcon, route: 'Payments' },
   { name: 'Analysis', label: 'Análisis', icon: AnalysisIcon, route: 'Analysis' },
 ];
 
 // Todos los tabs para web/desktop
 const ALL_TABS: Tab[] = [
   { name: 'Dashboard', label: 'Inicio', icon: HomeIcon, route: 'Dashboard' },
-  { name: 'Payments', label: 'Pagos', icon: PaymentsIcon, route: 'Payments' },
   { name: 'Transactions', label: 'Trans.', icon: TransactionsIcon, route: 'Transactions' },
-  { name: 'Installments', label: 'A Meses', icon: InstallmentsIcon, route: 'Installments' },
   { name: 'CreditCards', label: 'Tarjetas', icon: CardsIcon, route: 'CreditCards' },
+  { name: 'Payments', label: 'Pagos', icon: PaymentsIcon, route: 'Payments' },
+  { name: 'Installments', label: 'A Meses', icon: InstallmentsIcon, route: 'Installments' },
   { name: 'Analysis', label: 'Análisis', icon: AnalysisIcon, route: 'Analysis' },
   { name: 'Assets', label: 'Patrimonio', icon: AssetsIcon, route: 'Assets' },
   { name: 'Investments', label: 'Inversiones', icon: InvestmentsIcon, route: 'Investments' },
+  { name: 'UserSettings', label: 'Config', icon: SettingsIcon, route: 'UserSettings' },
 ];
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -94,7 +96,19 @@ export default function ModernTabBar({ state, descriptors, navigation }: ModernT
     });
 
     if (!isFocused && !event.defaultPrevented) {
-      navigation.navigate(route);
+      // UserSettings debe navegar como modal desde el Stack Navigator
+      if (route === 'UserSettings') {
+        // Navegar al Stack Navigator padre para abrir el modal
+        const parent = navigation.getParent();
+        if (parent) {
+          parent.navigate('UserSettings');
+        } else {
+          // Fallback: intentar navegar directamente
+          navigation.navigate('UserSettings');
+        }
+      } else {
+        navigation.navigate(route);
+      }
     }
   };
 
@@ -175,15 +189,16 @@ export default function ModernTabBar({ state, descriptors, navigation }: ModernT
   // Estilo del indicador animado
   const indicatorStyle = useAnimatedStyle(() => {
     const tabWidth = 100 / PRIMARY_TABS.length;
+    const translateXValue = interpolate(
+      indicatorPosition.value,
+      [0, PRIMARY_TABS.length - 1],
+      [0, (PRIMARY_TABS.length - 1) * tabWidth],
+      Extrapolate.CLAMP
+    );
     return {
       transform: [
         {
-          translateX: interpolate(
-            indicatorPosition.value,
-            [0, PRIMARY_TABS.length - 1],
-            [0, (PRIMARY_TABS.length - 1) * tabWidth],
-            Extrapolate.CLAMP
-          ) + '%',
+          translateX: `${translateXValue}%` as any,
         },
       ],
       opacity: indicatorOpacity.value,

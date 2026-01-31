@@ -1,19 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getDatabase } from '../services/database/adapter';
 import { TransactionSchema } from '../services/database/schema';
+import { generateAllRecurringTransactions, generateRecurringTransactions } from '../services/recurringTransactions';
 
 export const useTransactions = () => {
   const [transactions, setTransactions] = useState<TransactionSchema[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadTransactions = async () => {
+  const loadTransactions = useCallback(async () => {
     try {
-      console.log('[loadTransactions] Starting load...');
       setLoading(true);
       const db = await getDatabase();
       const data = await db.transactions.getAll();
-      console.log('[loadTransactions] Loaded transactions:', data.length);
       setTransactions(data);
       setError(null);
     } catch (err) {
@@ -21,18 +20,41 @@ export const useTransactions = () => {
       setError(err instanceof Error ? err.message : 'Error al cargar transacciones');
     } finally {
       setLoading(false);
-      console.log('[loadTransactions] Loading completed');
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadTransactions();
-  }, []);
+    
+    // Generar transacciones recurrentes pendientes al cargar
+    const generateRecurring = async () => {
+      try {
+        await generateAllRecurringTransactions();
+        // Recargar después de generar para mostrar las nuevas transacciones
+        await loadTransactions();
+      } catch (err) {
+        console.error('Error generating recurring transactions on load:', err);
+      }
+    };
+    
+    generateRecurring();
+  }, [loadTransactions]);
 
   const createTransaction = async (data: Omit<TransactionSchema, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       const db = await getDatabase();
       const newTransaction = await db.transactions.create(data);
+      
+      // Si es una transacción recurrente, generar las transacciones futuras
+      if (newTransaction.isRecurring && newTransaction.recurrencePeriod && newTransaction.recurrenceStartDate) {
+        try {
+          await generateRecurringTransactions(newTransaction);
+        } catch (recurringErr) {
+          console.error('Error generating recurring transactions:', recurringErr);
+          // No fallar la creación si hay error en la generación de recurrentes
+        }
+      }
+      
       await loadTransactions(); // Reload to ensure consistency
       return newTransaction;
     } catch (err) {

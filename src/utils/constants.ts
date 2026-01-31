@@ -39,3 +39,18 @@ export const PAYMENT_STATUS = {
 
 export type PaymentStatus = typeof PAYMENT_STATUS[keyof typeof PAYMENT_STATUS];
 
+export const RECURRENCE_PERIODS = {
+  DAILY: 'daily',
+  WEEKLY: 'weekly',
+  BIWEEKLY: 'biweekly',
+  MONTHLY: 'monthly',
+} as const;
+
+export type RecurrencePeriod = typeof RECURRENCE_PERIODS[keyof typeof RECURRENCE_PERIODS];
+
+export const RECURRENCE_PERIOD_LABELS: Record<RecurrencePeriod, string> = {
+  daily: 'Diario',
+  weekly: 'Semanal',
+  biweekly: 'Quincenal',
+  monthly: 'Mensual',
+};

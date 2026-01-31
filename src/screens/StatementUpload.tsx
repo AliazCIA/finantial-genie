@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme, getThemeColors } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { useCreditCards } from '../hooks/useCreditCards';
@@ -209,7 +210,7 @@ export default function StatementUpload() {
       } else if (skipped > 0) {
         showToast(`Todas las transacciones fueron omitidas (${skipped} duplicados)`, 'info');
       } else {
-        showToast('No se guardaron transacciones', 'warning');
+        showToast('No se guardaron transacciones', 'info');
       }
       
       // Reset form
@@ -531,7 +532,7 @@ export default function StatementUpload() {
               {toTitleCase('Transacciones Extraídas')} ({localExtractedTransactions.length})
             </Text>
             <TouchableOpacity
-              onPress={handleCheckDuplicates}
+              onPress={() => handleCheckDuplicates()}
               disabled={checkingDuplicates}
               style={{
                 paddingHorizontal: spacing.sm,
@@ -601,13 +602,14 @@ export default function StatementUpload() {
             </View>
           </View>
 
-          <Button
-            title={`Guardar ${nonDuplicateCount} Transacciones`}
-            onPress={handleSave}
-            disabled={saving || nonDuplicateCount === 0}
-            variant="primary"
-            style={{ marginTop: spacing.md }}
-          />
+          <View style={{ marginTop: spacing.md }}>
+            <Button
+              title={`Guardar ${nonDuplicateCount} Transacciones`}
+              onPress={handleSave}
+              disabled={saving || nonDuplicateCount === 0}
+              variant="primary"
+            />
+          </View>
         </Card>
       )}
     </ScrollView>

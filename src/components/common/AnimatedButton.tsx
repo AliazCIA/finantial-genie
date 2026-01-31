@@ -159,10 +159,10 @@ export default function AnimatedButton({
       minHeight: size === 'large' ? 56 : size === 'small' ? 36 : 44,
       width: fullWidth ? '100%' : 'auto',
       ...(variant === 'primary' && getShadowStyle(4)),
-      ...(Platform.OS === 'web' && {
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        userSelect: 'none',
-      }),
+      ...(Platform.OS === 'web' ? {
+        cursor: (disabled ? 'not-allowed' : 'pointer') as any,
+        userSelect: 'none' as any,
+      } : {}),
     },
     buttonText: {
       ...typography.button,

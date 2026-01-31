@@ -53,4 +53,8 @@ web-build/
 *.sqlite
 *.sqlite3
 
+# Server
+server/data/
+server/node_modules/
+
 /lambda/package

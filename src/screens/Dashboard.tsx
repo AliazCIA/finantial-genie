@@ -1,37 +1,87 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
-import { useFinancialSummary } from '../hooks/useFinancialSummary';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useTransactions } from '../hooks/useTransactions';
 import { useExpenseAnalysis } from '../hooks/useExpenseAnalysis';
 import { useCategories } from '../hooks/useCategories';
 import { useTheme, getThemeColors } from '../context/ThemeContext';
-import { formatCurrency, formatDate } from '../utils/formatters';
+import { useSync } from '../hooks/useSync';
+import { formatCurrency } from '../utils/formatters';
 import { typography } from '../theme/typography';
 import { spacing } from '../theme/spacing';
-import { getYear, getMonth } from 'date-fns';
+import { getYear, getMonth, startOfMonth, endOfMonth, isWithinInterval, parseISO, isAfter, isSameMonth } from 'date-fns';
+import { calculateMonthlySummary } from '../services/calculations/monthlySummary';
+import { calculateDailyExpenses } from '../services/calculations/dailyExpenses';
 import Card from '../components/common/Card';
 import GradientCard from '../components/common/GradientCard';
 import ProgressBar from '../components/common/ProgressBar';
-import { isDesktop, isTablet, getCardPadding, getContainerMaxWidth } from '../utils/responsive';
-
-// Helper function to convert to Title Case
-const toTitleCase = (str: string): string => {
-  return str.replace(/\w\S*/g, (txt) => {
-    return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-  });
-};
+import DailyChart from '../components/common/DailyChart';
+import MonthSelector from '../components/MonthSelector';
+import ExpandableSyncButton from '../components/common/ExpandableSyncButton';
+import QuickAddButton from '../components/common/QuickAddButton';
+import TransactionModal from '../components/TransactionModal';
+import { isDesktop, isTablet, isMobile, getCardPadding, getContainerMaxWidth } from '../utils/responsive';
 
 export default function Dashboard() {
-  const { monthlySummary, netWorth, installmentTotalPending, currentMonthDebt, creditCardExpenses, totalCreditCardDebt, loading } = useFinancialSummary();
+  const navigation = useNavigation<any>();
+  const { transactions, refresh } = useTransactions();
   const { theme } = useTheme();
   const themeColors = getThemeColors(theme);
   const { categories } = useCategories();
+  const { isConnected, pendingChanges, sync, isSyncing } = useSync();
+  const [showQuickModal, setShowQuickModal] = useState(false);
   
-  // Get current year and month
-  const currentYear = getYear(new Date());
-  const currentMonth = getMonth(new Date()) + 1; // getMonth returns 0-11, we need 1-12
+  // Refresh transactions when modal closes (in case a transaction was added)
+  React.useEffect(() => {
+    if (!showQuickModal) {
+      // Small delay to ensure any pending operations complete
+      const timer = setTimeout(() => {
+        refresh();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [showQuickModal, refresh]);
   
-  // Use expense analysis for current month only
-  const { categoryExpenses } = useExpenseAnalysis(currentYear, currentMonth);
+  // State for selected month - siempre inicia con el mes actual
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    return startOfMonth(today); // Asegurar que siempre inicie con el inicio del mes actual
+  });
+  
+  // Verificar que el mes seleccionado tenga transacciones (permitir futuros si hay datos)
+  React.useEffect(() => {
+    const currentMonthStart = startOfMonth(new Date());
+    const selectedMonthStart = startOfMonth(selectedDate);
+    
+    // Calcular el mes máximo con transacciones
+    let maxMonthWithTransactions = currentMonthStart;
+    if (transactions.length > 0) {
+      transactions.forEach(txn => {
+        const txnDate = parseISO(txn.date);
+        const txnMonthStart = startOfMonth(txnDate);
+        if (isAfter(txnMonthStart, maxMonthWithTransactions) || isSameMonth(txnDate, maxMonthWithTransactions)) {
+          maxMonthWithTransactions = txnMonthStart;
+        }
+      });
+    }
+    
+    // Solo corregir si el mes seleccionado está más allá del mes máximo con transacciones
+    if (isAfter(selectedMonthStart, maxMonthWithTransactions)) {
+      setSelectedDate(maxMonthWithTransactions);
+    }
+  }, [selectedDate, transactions]);
+  
+  const selectedYear = getYear(selectedDate);
+  const selectedMonth = getMonth(selectedDate) + 1;
+  
+  // Calculate monthly summary for selected month
+  const monthlySummary = calculateMonthlySummary(transactions, selectedYear, selectedMonth, []);
+  
+  // Calculate daily expenses
+  const dailyExpenses = calculateDailyExpenses(transactions, selectedYear, selectedMonth);
+  
+  // Get expense analysis for selected month
+  const { categoryExpenses } = useExpenseAnalysis(selectedYear, selectedMonth);
   
   // Helper to get category icon and color
   const getCategoryInfo = (categoryId: string) => {
@@ -44,11 +94,11 @@ export default function Dashboard() {
   
   // Calculate total for percentage calculation
   const totalCategoryExpenses = categoryExpenses.reduce((sum, cat) => sum + cat.total, 0);
-
+  
   // Calculate available amount (income - expenses)
   const availableAmount = monthlySummary.totalIncome - monthlySummary.totalExpenses;
-
-  // Aplicar gradiente al fondo en web usando ref - DEBE estar antes de cualquier return
+  
+  // Aplicar gradiente al fondo en web usando ref
   const scrollViewRef = React.useRef<any>(null);
   
   React.useEffect(() => {
@@ -58,18 +108,15 @@ export default function Dashboard() {
         ? 'linear-gradient(180deg, rgba(15, 23, 42, 1) 0%, rgba(30, 41, 59, 0.98) 50%, rgba(15, 23, 42, 0.95) 100%)'
         : 'linear-gradient(180deg, rgba(248, 250, 252, 1) 0%, rgba(255, 255, 255, 0.98) 50%, rgba(248, 250, 252, 0.95) 100%)';
       
-      // Intentar aplicar el gradiente de diferentes formas
       const applyGradient = (el: any) => {
         if (el && el.style) {
           el.style.backgroundImage = gradientBg;
         }
-        // También intentar en el elemento padre si existe
         if (el && el.parentElement && el.parentElement.style) {
           el.parentElement.style.backgroundImage = gradientBg;
         }
       };
 
-      // Usar setTimeout para asegurar que el DOM esté listo
       setTimeout(() => {
         if (element._nativeNode) {
           applyGradient(element._nativeNode);
@@ -92,20 +139,26 @@ export default function Dashboard() {
       width: '100%',
       alignSelf: 'center',
       paddingHorizontal: isDesktop ? spacing.xl : spacing.md,
-      paddingTop: isDesktop ? spacing.lg : spacing.md,
+      paddingTop: spacing.xs,
       paddingBottom: spacing.lg,
     },
     header: {
-      marginBottom: isDesktop ? spacing.lg : spacing.md,
-      paddingBottom: spacing.md,
-      borderBottomWidth: 1,
+      marginBottom: spacing.xs,
+      paddingBottom: spacing.xs,
+      borderBottomWidth: 0.5,
       borderBottomColor: themeColors.border,
+    },
+    headerTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      marginBottom: spacing.xs / 2,
     },
     title: {
       ...typography.h1,
       color: themeColors.primary,
       fontWeight: '700',
-      marginBottom: spacing.xs / 2,
       fontSize: isDesktop ? 32 : 26,
     },
     subtitle: {
@@ -113,39 +166,13 @@ export default function Dashboard() {
       color: themeColors.textSecondary,
       fontSize: isDesktop ? 15 : 13,
     },
-    // Grid system usando Flexbox
-    gridContainer: {
-      flexDirection: isDesktop ? 'row' : 'column',
-      flexWrap: isDesktop ? 'wrap' : 'nowrap',
-      marginBottom: isDesktop ? spacing.lg : spacing.md,
-      ...(Platform.OS === 'web' && isDesktop && {
-        marginLeft: -spacing.md,
-        marginRight: -spacing.md,
-      }),
+    summaryCards: {
+      flexDirection: isDesktop ? 'row' : 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.xs,
     },
-    gridItem: {
-      ...(isDesktop && Platform.OS === 'web' && {
-        width: '50%',
-        paddingLeft: spacing.md,
-        paddingRight: spacing.md,
-        marginBottom: spacing.lg,
-      }),
-      ...(isDesktop && Platform.OS !== 'web' && {
-        flex: 1,
-        minWidth: '45%',
-        marginHorizontal: spacing.sm,
-        marginBottom: spacing.lg,
-      }),
-      ...(isTablet && Platform.OS === 'web' && {
-        width: '50%',
-        paddingLeft: spacing.md,
-        paddingRight: spacing.md,
-        marginBottom: spacing.md,
-      }),
-      ...(!isDesktop && !isTablet && {
-        width: '100%',
-        marginBottom: spacing.md,
-      }),
+    summaryCard: {
+      flex: 1,
     },
     cardTitle: {
       ...typography.h4,
@@ -155,15 +182,14 @@ export default function Dashboard() {
       fontSize: isDesktop ? 20 : 18,
     },
     summaryRow: {
-      flexDirection: isDesktop ? 'row' : 'column',
+      flexDirection: 'row',
       justifyContent: 'space-around',
-      gap: isDesktop ? spacing.lg : spacing.md,
+      gap: spacing.md,
       marginBottom: spacing.sm,
     },
     summaryItem: {
       alignItems: 'center',
-      flex: isDesktop ? 1 : undefined,
-      paddingVertical: isDesktop ? 0 : spacing.sm,
+      flex: 1,
     },
     summaryLabel: {
       ...typography.bodySmall,
@@ -173,7 +199,7 @@ export default function Dashboard() {
       fontWeight: '500',
     },
     summaryValue: {
-      fontSize: isDesktop ? 32 : 26,
+      fontSize: isDesktop ? 24 : 20,
       fontWeight: '700',
       letterSpacing: -0.02,
     },
@@ -198,7 +224,7 @@ export default function Dashboard() {
       fontWeight: '500',
     },
     balanceValue: {
-      fontSize: isDesktop ? 36 : 30,
+      fontSize: isDesktop ? 24 : 20,
       fontWeight: '700',
       letterSpacing: -0.02,
     },
@@ -207,18 +233,6 @@ export default function Dashboard() {
     },
     negative: {
       color: themeColors.secondary,
-    },
-    netWorthValue: {
-      fontSize: isDesktop ? 42 : 36,
-      color: themeColors.primary,
-      fontWeight: '700',
-      letterSpacing: -0.02,
-    },
-    pendingValue: {
-      fontSize: isDesktop ? 36 : 28,
-      color: themeColors.secondary,
-      fontWeight: '700',
-      letterSpacing: -0.02,
     },
     categoryItem: {
       marginBottom: spacing.md,
@@ -257,59 +271,10 @@ export default function Dashboard() {
       color: themeColors.textSecondary,
       fontStyle: 'italic',
       fontSize: isDesktop ? 13 : 12,
-    },
-    creditCardItem: {
-      marginBottom: spacing.md,
-      paddingBottom: spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: themeColors.border,
-    },
-    creditCardItemLast: {
-      marginBottom: 0,
-      paddingBottom: 0,
-      borderBottomWidth: 0,
-    },
-    creditCardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: spacing.xs,
-    },
-    creditCardColorBar: {
-      width: 4,
-      height: 40,
-      borderRadius: 2,
-      marginRight: spacing.md,
-    },
-    creditCardDetails: {
-      flex: 1,
-    },
-    creditCardName: {
-      ...typography.body,
-      color: themeColors.text,
-      fontWeight: '600',
-      fontSize: isDesktop ? 17 : 15,
-      marginBottom: spacing.xs / 2,
-    },
-    creditCardMeta: {
-      ...typography.bodySmall,
-      color: themeColors.textSecondary,
-      fontSize: isDesktop ? 13 : 12,
-      marginBottom: spacing.xs / 2,
-    },
-    creditCardAmount: {
-      fontSize: isDesktop ? 24 : 20,
-      fontWeight: '700',
-      letterSpacing: -0.01,
+      textAlign: 'center',
+      padding: spacing.lg,
     },
   });
-
-  if (loading) {
-    return (
-      <View style={[dynamicStyles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: themeColors.text }}>Cargando...</Text>
-      </View>
-    );
-  }
 
   return (
     <ScrollView 
@@ -319,162 +284,135 @@ export default function Dashboard() {
       showsVerticalScrollIndicator={Platform.OS === 'web'}
     >
       <View style={dynamicStyles.contentWrapper}>
+        {/* Sync Button - Esquina superior izquierda */}
+        <ExpandableSyncButton />
+
         {/* Header */}
         <View style={dynamicStyles.header}>
-          <Text style={dynamicStyles.title}>Dashboard</Text>
+          <View style={dynamicStyles.headerTop}>
+            <Text style={dynamicStyles.title}>Dashboard</Text>
+            <QuickAddButton onPress={() => setShowQuickModal(true)} />
+          </View>
           <Text style={dynamicStyles.subtitle}>Resumen financiero</Text>
         </View>
 
-        {/* Grid Layout - Primera fila: Resumen del Mes y Gastos por Categoría */}
-        <View style={dynamicStyles.gridContainer}>
-          {/* Resumen del Mes */}
-          <View style={dynamicStyles.gridItem}>
-            <GradientCard padding={getCardPadding()} marginBottom={0} gradient="primary">
-            <Text style={dynamicStyles.cardTitle}>{toTitleCase('Resumen del Mes')}</Text>
-            <View style={dynamicStyles.summaryRow}>
-              <View style={dynamicStyles.summaryItem}>
-                <Text style={dynamicStyles.summaryLabel}>Ingresos</Text>
-                <Text style={[dynamicStyles.summaryValue, dynamicStyles.income]}>
-                  {formatCurrency(monthlySummary.totalIncome)}
-                </Text>
-              </View>
-              <View style={dynamicStyles.summaryItem}>
-                <Text style={dynamicStyles.summaryLabel}>Gastos</Text>
-                <Text style={[dynamicStyles.summaryValue, dynamicStyles.expense]}>
+        {/* Month Selector */}
+        <MonthSelector selectedDate={selectedDate} onDateChange={setSelectedDate} transactions={transactions} />
+
+        {/* Summary Cards - Compact Layout */}
+        <View style={dynamicStyles.summaryCards}>
+          {/* Expenses Card */}
+          <View style={dynamicStyles.summaryCard}>
+            <GradientCard padding={isMobile ? spacing.xs : spacing.sm} marginBottom={0} gradient="secondary">
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[dynamicStyles.cardTitle, { 
+                  marginBottom: 0, 
+                  fontSize: isDesktop ? 16 : isMobile ? 11 : 14,
+                  fontWeight: '600',
+                }]}>Gastos</Text>
+                <Text style={[dynamicStyles.summaryValue, dynamicStyles.expense, { 
+                  fontSize: isDesktop ? 24 : isMobile ? 16 : 20 
+                }]}>
                   {formatCurrency(monthlySummary.totalExpenses)}
                 </Text>
               </View>
-            </View>
-            <View style={dynamicStyles.balanceContainer}>
-              <Text style={dynamicStyles.balanceLabel}>Disponible</Text>
-              <Text style={[dynamicStyles.balanceValue, availableAmount >= 0 ? dynamicStyles.positive : dynamicStyles.negative]}>
-                {formatCurrency(availableAmount)}
-              </Text>
-            </View>
-          </GradientCard>
+            </GradientCard>
           </View>
 
-          {/* Gastos por Categoría */}
-          {categoryExpenses.length > 0 && (
-            <View style={dynamicStyles.gridItem}>
-              <GradientCard padding={getCardPadding()} marginBottom={0} gradient="subtle">
-              <Text style={dynamicStyles.cardTitle}>{toTitleCase('Gastos por Categoría')}</Text>
-              {categoryExpenses.slice(0, 6).map((category, index) => {
-                const categoryInfo = getCategoryInfo(category.categoryId);
-                const percentage = totalCategoryExpenses > 0 
-                  ? (category.total / totalCategoryExpenses) * 100 
-                  : 0;
-                
-                return (
-                  <View key={category.categoryId || index} style={dynamicStyles.categoryItem}>
-                    <View style={dynamicStyles.categoryHeader}>
-                      <View style={dynamicStyles.categoryInfo}>
-                        <Text style={dynamicStyles.categoryIcon}>{categoryInfo.icon}</Text>
-                        <Text style={dynamicStyles.categoryName}>{category.categoryName}</Text>
-                      </View>
-                      <Text style={dynamicStyles.categoryAmount}>{formatCurrency(category.total)}</Text>
-                    </View>
-                    <ProgressBar
-                      value={percentage}
-                      color={categoryInfo.color}
-                      height={isDesktop ? 8 : 6}
-                    />
-                  </View>
-                );
-              })}
-              </GradientCard>
-            </View>
-          )}
-
-          {/* Segunda fila: Patrimonio Neto y otras métricas */}
-          <View style={dynamicStyles.gridItem}>
-            <GradientCard padding={getCardPadding()} marginBottom={0} gradient="accent">
-            <Text style={dynamicStyles.cardTitle}>{toTitleCase('Patrimonio Neto')}</Text>
-            <Text style={dynamicStyles.netWorthValue}>{formatCurrency(netWorth)}</Text>
-          </GradientCard>
-          </View>
-
-          {/* Deuda del Mes Actual o Pendiente Total */}
-          {currentMonthDebt > 0 ? (
-            <View style={dynamicStyles.gridItem}>
-              <GradientCard padding={getCardPadding()} marginBottom={0} gradient="secondary">
-              <Text style={dynamicStyles.cardTitle}>{toTitleCase('Deuda del Mes Actual')}</Text>
-              <Text style={dynamicStyles.pendingValue}>{formatCurrency(currentMonthDebt)}</Text>
-              <Text style={[dynamicStyles.emptyText, { marginTop: spacing.sm }]}>
-                Pagos a meses vencidos este mes
-              </Text>
-            </GradientCard>
-            </View>
-          ) : installmentTotalPending > 0 ? (
-            <View style={dynamicStyles.gridItem}>
-              <GradientCard padding={getCardPadding()} marginBottom={0} gradient="secondary">
-              <Text style={dynamicStyles.cardTitle}>{toTitleCase('Pendiente Total a Meses')}</Text>
-              <Text style={dynamicStyles.pendingValue}>{formatCurrency(installmentTotalPending)}</Text>
-            </GradientCard>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Gastos de Tarjetas de Crédito - Full Width */}
-        {creditCardExpenses.length > 0 && (
-          <View style={{ marginTop: isDesktop ? spacing.lg : spacing.md }}>
-            <GradientCard padding={getCardPadding()} marginBottom={0} gradient="subtle">
-            <Text style={dynamicStyles.cardTitle}>{toTitleCase('Gastos de Tarjetas de Crédito')}</Text>
-            {creditCardExpenses.map((summary, index) => (
-              <View 
-                key={summary.cardId} 
-                style={[
-                  dynamicStyles.creditCardItem,
-                  index === creditCardExpenses.length - 1 && dynamicStyles.creditCardItemLast
-                ]}
-              >
-                <View style={dynamicStyles.creditCardHeader}>
-                  <View
-                    style={[
-                      dynamicStyles.creditCardColorBar,
-                      { backgroundColor: summary.cardColor }
-                    ]}
-                  />
-                  <View style={dynamicStyles.creditCardDetails}>
-                    <Text style={dynamicStyles.creditCardName}>
-                      {summary.cardName} ({summary.bank})
-                    </Text>
-                    <Text style={dynamicStyles.creditCardMeta}>
-                      Vence: {formatDate(summary.paymentDueDate)} ({summary.daysUntilDue} días)
-                    </Text>
-                    {summary.totalExpenses > 0 && (
-                      <Text style={[dynamicStyles.emptyText, { fontSize: isDesktop ? 12 : 11 }]}>
-                        {summary.normalExpenses > 0 && summary.installmentExpenses > 0 ? (
-                          <>Gastos: {formatCurrency(summary.normalExpenses)} | A meses: {formatCurrency(summary.installmentExpenses)}</>
-                        ) : summary.normalExpenses > 0 ? (
-                          <>Gastos: {formatCurrency(summary.normalExpenses)}</>
-                        ) : summary.installmentExpenses > 0 ? (
-                          <>A meses: {formatCurrency(summary.installmentExpenses)}</>
-                        ) : null}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={[
-                    dynamicStyles.creditCardAmount, 
-                    { color: summary.isDueThisMonth ? themeColors.secondary : themeColors.text }
-                  ]}>
-                    {formatCurrency(summary.totalExpenses)}
-                  </Text>
-                </View>
-              </View>
-            ))}
-            {totalCreditCardDebt > 0 && (
-              <View style={[dynamicStyles.balanceContainer, { marginTop: spacing.md }]}>
-                <Text style={dynamicStyles.balanceLabel}>Total a Pagar este Mes</Text>
-                <Text style={[dynamicStyles.balanceValue, { color: themeColors.secondary }]}>
-                  {formatCurrency(totalCreditCardDebt)}
+          {/* Income Card */}
+          <View style={dynamicStyles.summaryCard}>
+            <GradientCard padding={isMobile ? spacing.xs : spacing.sm} marginBottom={0} gradient="accent">
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[dynamicStyles.cardTitle, { 
+                  marginBottom: 0, 
+                  fontSize: isDesktop ? 16 : isMobile ? 11 : 14,
+                  fontWeight: '600',
+                }]}>Ingresos</Text>
+                <Text style={[dynamicStyles.summaryValue, dynamicStyles.income, { 
+                  fontSize: isDesktop ? 24 : isMobile ? 16 : 20 
+                }]}>
+                  {formatCurrency(monthlySummary.totalIncome)}
                 </Text>
               </View>
-            )}
             </GradientCard>
           </View>
+
+          {/* Balance Card */}
+          <View style={dynamicStyles.summaryCard}>
+            <GradientCard padding={isMobile ? spacing.xs : spacing.sm} marginBottom={0} gradient="primary">
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[dynamicStyles.balanceLabel, { 
+                  marginBottom: 0, 
+                  fontSize: isDesktop ? 16 : isMobile ? 11 : 14,
+                  fontWeight: '600',
+                }]}>Balance</Text>
+                <Text style={[dynamicStyles.balanceValue, availableAmount >= 0 ? dynamicStyles.positive : dynamicStyles.negative, { 
+                  fontSize: isDesktop ? 24 : isMobile ? 16 : 20 
+                }]}>
+                  {formatCurrency(availableAmount)}
+                </Text>
+              </View>
+            </GradientCard>
+          </View>
+        </View>
+
+        {/* Daily Chart */}
+        <GradientCard padding={getCardPadding()} marginBottom={spacing.sm} gradient="subtle">
+          <Text style={[dynamicStyles.cardTitle, { marginBottom: spacing.xs }]}>Actividad Diaria</Text>
+          <DailyChart 
+            dailyData={dailyExpenses} 
+            transactions={transactions}
+            categories={categories}
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            height={isDesktop ? 200 : 160} 
+          />
+        </GradientCard>
+
+        {/* Expenses by Category - Show first on mobile/tablet, after chart on desktop */}
+        {categoryExpenses.length > 0 && (
+          <GradientCard padding={getCardPadding()} marginBottom={spacing.sm} gradient="subtle">
+            <Text style={dynamicStyles.cardTitle}>Gastos por Categoría</Text>
+            {categoryExpenses.slice(0, isDesktop ? 8 : 6).map((category, index) => {
+              const categoryInfo = getCategoryInfo(category.categoryId);
+              const percentage = totalCategoryExpenses > 0 
+                ? (category.total / totalCategoryExpenses) * 100 
+                : 0;
+              
+              return (
+                <View key={category.categoryId || index} style={dynamicStyles.categoryItem}>
+                  <View style={dynamicStyles.categoryHeader}>
+                    <View style={dynamicStyles.categoryInfo}>
+                      <Text style={dynamicStyles.categoryIcon}>{categoryInfo.icon}</Text>
+                      <Text style={dynamicStyles.categoryName}>{category.categoryName}</Text>
+                    </View>
+                    <Text style={dynamicStyles.categoryAmount}>{formatCurrency(category.total)}</Text>
+                  </View>
+                  <ProgressBar
+                    value={percentage}
+                    color={categoryInfo.color}
+                    height={isDesktop ? 8 : 6}
+                  />
+                </View>
+              );
+            })}
+          </GradientCard>
+        )}
+
+        {/* Additional Info - Only on Desktop */}
+        {isDesktop && (
+          <>
+            {/* More detailed stats or other info can go here */}
+          </>
         )}
       </View>
+
+      {/* Quick Transaction Modal */}
+      <TransactionModal
+        visible={showQuickModal}
+        onClose={() => setShowQuickModal(false)}
+        isQuickCapture={true}
+      />
     </ScrollView>
   );
 }

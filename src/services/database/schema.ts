@@ -8,6 +8,9 @@ export interface TransactionSchema {
   description: string;
   date: string; // ISO date string
   isRecurring: boolean;
+  recurrencePeriod: 'monthly' | 'biweekly' | 'weekly' | 'daily' | null; // Período de recurrencia
+  recurrenceStartDate: string | null; // Fecha de inicio de la recurrencia
+  parentRecurringId: string | null; // ID de la transacción padre si es generada automáticamente
   creditCardId: string | null;
   createdAt: string;
   updatedAt: string;

@@ -97,14 +97,15 @@ export const compareMonthToMonth = (
   const allCategories = new Set([...currentMap.keys(), ...previousMap.keys()]);
 
   return Array.from(allCategories).map(categoryId => {
-    const current = currentMap.get(categoryId) || { total: 0, categoryName: '', percentage: 0, count: 0 };
-    const previous = previousMap.get(categoryId) || { total: 0, categoryName: '', percentage: 0, count: 0 };
+    const current = currentMap.get(categoryId) || { categoryId, total: 0, categoryName: '', percentage: 0, count: 0 };
+    const previous = previousMap.get(categoryId) || { categoryId, total: 0, categoryName: '', percentage: 0, count: 0 };
 
     const change = current.total - previous.total;
     const changePercentage = previous.total > 0 ? (change / previous.total) * 100 : 0;
 
     return {
       ...current,
+      categoryId, // Ensure categoryId is always present
       change,
       changePercentage,
     };

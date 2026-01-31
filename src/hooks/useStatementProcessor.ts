@@ -20,7 +20,7 @@ export const useStatementProcessor = () => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [extractedTransactions, setExtractedTransactions] = useState<ExtractedTransaction[]>([]);
-  const { transactions, loadTransactions } = useTransactions();
+  const { transactions, refresh: loadTransactions } = useTransactions();
   const { creditCards } = useCreditCards();
 
   /**

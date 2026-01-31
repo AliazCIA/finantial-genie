@@ -9,14 +9,15 @@ import { calculateBiweeklyAvailability, getMonthlyIncome } from '../services/cal
 import { getMonth, getYear, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { getPaymentsForCurrentMonth } from '../services/calculations/installmentCalculator';
 import { calculateCreditCardExpenses } from '../services/calculations/creditCardExpenses';
+import type { AssetSchema, LiabilitySchema, FixedExpenseSchema } from '../services/database/schema';
 
 export const useFinancialSummary = () => {
   const { transactions } = useTransactions();
   const { creditCards } = useCreditCards();
   const { totalPending: installmentTotalPending, payments } = useInstallments();
-  const [assets, setAssets] = useState([]);
-  const [liabilities, setLiabilities] = useState([]);
-  const [fixedExpenses, setFixedExpenses] = useState([]);
+  const [assets, setAssets] = useState<AssetSchema[]>([]);
+  const [liabilities, setLiabilities] = useState<LiabilitySchema[]>([]);
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpenseSchema[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
